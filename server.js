@@ -1,6 +1,7 @@
 const express = require('express');
 const contractInstance = require('./deployContract.js');
 const web3 = require('./web3Client.js');
+
 const app = express();
 const bodyParser = require('body-parser');
 const candidates = require('./candidates.js');
@@ -10,37 +11,46 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(bodyParser.json());
 
 app.post('/vote', (req, res) => {
-  try {
-    const candidateName = req.body.candidateName.trim();
+  const candidateName = req.body.candidateName.trim();
+  const sender = req.body.sender.trim();
+  console.log('Vote for', candidateName, sender);
 
-    contractInstance.voteForCandidate(candidateName, { from: web3.eth.accounts[0] }, function(result) {
-      const totalVotes = contractInstance.totalVotesFor.call(candidateName, { from: web3.eth.accounts[0] }).toString();
-      res.send({ votes: totalVotes, name: candidateName });
-    });
-  } catch (e) {
-    res.status('400').send(`Failed! ${e}`);
+  contractInstance.voteForCandidate(candidateName, { from: sender }, () => {
+    const totalVotes = contractInstance.totalVotesFor.call(
+      candidateName,
+      { from: sender }
+    ).toString();
+
+    res.json({ votes: totalVotes, name: candidateName });
+  });
+});
+
+app.get('/state', (req, res) => {
+  const candidateVotes = candidates.map((candidate) => {
+    const votes = contractInstance.totalVotesFor.call(
+      candidate,
+      { from: web3.eth.accounts[0] }
+    ).toString();
+
+    return {
+      name: candidate,
+      votes,
+    };
+  });
+
+  res.json({ candidates: candidateVotes, accounts: web3.eth.accounts });
+});
+
+app.use((err, req, res, next) => {
+  if (err) {
+    console.error(err.stack);
+    res.status(500).send(`Failed! ${err}`);
+  } else {
+    next();
   }
 });
 
-app.get('/candidates', (req, res) => {
-  console.log('candidates start')
-  try {
-    const candidateVotes = candidates.map((candidate) => {
-      console.log('call for', candidate);
-      const votes = contractInstance.totalVotesFor.call(candidate, { from: web3.eth.accounts[0] }).toString();
-
-      return {
-        name: candidate,
-        votes: votes,
-      };
-    });
-
-    res.send({ candidates: candidateVotes });
-  } catch (e) {
-    res.status('400').send(`Failed! ${e}`);
-  }
-});
-
-app.listen(3000, () => {
-  console.log('App ready and listening on port 3000!')
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`App ready and listening on port ${port}!`);
 });

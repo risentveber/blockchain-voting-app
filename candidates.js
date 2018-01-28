@@ -1,1 +1,1 @@
-module.exports = ['Putin', 'Navalny', 'AgainstAll']
+module.exports = ['Putin', 'Navalny', 'Against'];
